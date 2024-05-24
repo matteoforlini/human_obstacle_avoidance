@@ -40,6 +40,11 @@ In the folder there are three .py files, the main one to run is main_human_pose_
 
 ## Avoidance Algorithm
 In the folder is present the main file to run ..... and the .....py to read the joint angles.
+In the main file set:
+1.  the tool dimension of your application;
+2.  the mode that you want (1: 6DoF, 2: 5DoF, 3:3Dof);
+3.  the type of scenario (robot in movement: example=1, robot fixed: example=2)
+4.  Date of acquistion: to save all the variables and graphs inside that folder that is inside Data folder.
 
 ## UR Script 
 In the folder is present the script file that has to be calles from a .urp Universal Robot programm file inside the robot controller. Check the IP of the robot, has to be the same set in the codes file.
