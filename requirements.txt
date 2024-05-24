@@ -1,0 +1,5 @@
+numpy
+opencv-python
+pyrealsense2
+mediapipe		==0.8.10.1
+matlabengine		==R2021b
