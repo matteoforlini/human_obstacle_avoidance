@@ -21,7 +21,7 @@ Step to run the system:
 1. Calibrate the three DepthCameras obtaining the extrinsic and intrinsic parameters for each of them.
 2. Run the Pose detection system with the file main_human_pose_detection.py.
 3. Run get_UR_actual_joint.py that is inside the Avoidance Folder, this file reads joints angle from the robot.
-4. Run the Avoidance algorithm with the MatLab file..... .mat.
+4. Run the Avoidance algorithm with the MatLab file A0_obst_avoid_main.m.
 5. Run the UR program on the UR techpendant.
 
 Human Pose Detection software uses:
@@ -37,7 +37,7 @@ In the following image, the architecture of the overall system is presented.
 In the folder, there are three Python files. The main file to run is main_human_pose_detection.py. This file calls the other Python files and two MATLAB functions. In the function rototrasla_robot.m, the extrinsic parameters from the camera calibration, saved in the MATLAB variable T1r_opt.mat ... T3r_opt.mat, are used.
 
 ## Avoidance Algorithm
-In the folder is present the main file to run ..... and the get_UR_actual_joint.py to read the joint angles.
+In the folder is present the main file to run A0_obst_avoid_main.m and the get_UR_actual_joint.py to read the joint angles.
 In the main file set:
 1.  the tool dimension for your application;
 2.  the mode you want (1: 6DoF, 2: 5DoF, 3:3Dof);
