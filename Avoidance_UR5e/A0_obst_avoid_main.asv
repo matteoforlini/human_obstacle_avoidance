@@ -1,0 +1,455 @@
+close allPunto
+clear 
+clear global 
+clc
+
+
+
+global X_i X_f dt T r r_min... 
+       v0_rep v0_att k_e Q_i O dO k_v lambda_max eps...
+       dQ_max  UR5 ik weights v_1 v_2 r_inf r_sup tool
+
+%% To set
+example=2; % example 1 robot movment, 2 robot fixed
+rectilinear=0; % 1=yes; 0=no   %se sta a 0 posso toglierlo ovunque usato 
+mode=1; % 3 mode: 1=6dof; 2=6dof; 3=3dof
+TrajectoryOnline=1; 
+tool=0.205; 
+Date = 'Dati_2024_05_10'; % Name directory
+
+%>>>>>>>>>>>>>>>>>
+if rectilinear==1; TrajectoryOnline=1; end
+%>>>>>>>>>>>>>>>>>>
+%% Data
+dQ_max=0.5*pi; %rad/s %max robot joint speed
+v0_rep=0.4; %repulsive velocity
+v0_att=1.2; %used in trajectory generation
+k_e_tra=1.1; % Coefficient traslation
+k_e_rot=10; % Coefficient rotation
+k_e=[k_e_tra,k_e_tra,k_e_tra,k_e_rot,k_e_rot,k_e_rot]'; % 1.1=sembra buono;
+k_v=10; % used only if it is known the velocity of the obstacle, not in the camera case
+order_Bezier_curve = 3; %(3-4-5)
+lambda_max=10^-3; % Damped Least squares
+eps=10^-3;  %minimum svd
+r_inf=0.20; %used only in case of obstacle velocity is avaible
+r_sup=0.30; %used only in case of obstacle velocity is avaible
+
+r_min=0.20; %minimum distance to mantain
+r=4/3*r_min; %r of activation of the avoidance (r_sup in the graph of the distance in the article)
+
+UR5 = importrobot('urdf_New\ur5e_robot_tool.urdf');
+UR5.DataFormat='row';
+ik = robotics.InverseKinematics('RigidBodyTree', UR5);
+weights = [1, 1, 1, 1, 1, 1];
+
+%% Esempi
+[T,steps,n_frame,dt,v_1,v_2,Oi,Of,dOi,X_i,X_f]=Dati_simulazione(example);
+
+%% Cinematica inversa di posizione
+R_ad=[0     0     -1;
+      0     1      0;
+      1     0      0];
+Rz180=[-1    0     0;
+        0   -1     0;
+        0    0     1];
+eul_i=X_i(4:6); %angoli di eulero
+eul_f=X_f(4:6);
+R_i=eul2rotm(eul_i','ZYZ')*(R_ad); 
+R_f=eul2rotm(eul_f','ZYZ')*(R_ad);
+X_model_i=X_i;
+X_model_f=X_f;
+X_model_i(1:3)=Rz180*X_model_i(1:3); 
+X_model_f(1:3)=Rz180*X_model_f(1:3);
+X_model_i(4:6)=rotm2eul(R_i,'ZYZ');  
+X_model_f(4:6)=rotm2eul(R_f,'ZYZ');
+%%%%%%%%%%%%%%%%%%%
+
+%% Straight robot
+initialguess=[pi -pi/2 -pi/2 -pi/2 pi/2 0]; %initial position for the inverse kinematics to obtain the joint value of the initial pose
+%in the real robot put the initial joints configuration as indicated in the
+%article (see joints position graphs)
+pose=[eul2rotm(X_model_i(4:6)','ZYZ') X_model_i(1:3); 0 0 0 1];
+Q_i = ik('ee_link',pose,weights,initialguess);
+Q_i=Q_i';
+pose=[eul2rotm(X_model_f(4:6)','ZYZ') X_model_f(1:3); 0 0 0 1];
+Q_f = ik('ee_link',pose,weights,initialguess);
+Q_f=Q_f';
+
+%% Trajectory generation
+
+[O,dO]=obstacles_generation(Oi,Of,dOi,dt,T); 
+O=O*0; %used only in case if it is necessary to simulate some obstacles, in this demo are not simulated any obstacles, the obstacles are detected by cameras
+dO=dO*0;
+
+%>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+%% Cut matrix
+app_dO=squeeze(dO(:,1,:)); 
+app_O=squeeze(O(:,1,:));
+
+%% Trajectory rectilinear without obstacle
+if rectilinear==1
+    app_dO=app_dO*0;
+    app_O=app_O*0;
+end
+
+%% remove obstacle
+if TrajectoryOnline==1
+    O=O*0;
+    dO=dO*0;
+end
+%>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> e tohli anche trajectory online
+%% compute bezier
+[t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve); % compute trajectory
+
+ellipsoid = [];
+istant = 0;
+
+%% Open UDP
+u = udpport('datagram','IPV4','LocalPort',2000); % for robot joint reading
+v = udpport('datagram','IPV4','LocalPort',2020); % for obstacles reading
+pause(1);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Connection to the robot
+host = '169.254.0.25'; % server IP address on computer
+port = 30000; % IP port on UR manipulators % 30003 realtime % 30000 
+backlog = 1; % number of connections
+RobotIP = '169.254.0.4'; % IP Robot
+PCCamere = '169.254.0.20'; % IP PC Skeleton
+
+% Connect to the robot
+robot.HOST=host;
+robot.PORT=int32(port);   
+robot.BACKLOG=int32(backlog);
+
+robot.MODULE = py.importlib.import_module('URServer');
+robot.SERVER = robot.MODULE.initServer('',robot.PORT,robot.BACKLOG); % Create server socket on computer
+
+% Create a robot instance
+UR5_istance = UR(robot);
+
+disp('Connected!');
+
+%% Go to initial position
+Position =  [Q_i(1),Q_i(2),Q_i(3),Q_i(4),Q_i(5),Q_i(6)]; % Initial position
+msg(UR5_istance,sprintf('(%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)',Position,zeros(6,1)));
+pause(6); % Aspetta che il robot si posizioni nel punto iniziale
+disp('Move!');
+
+%% Reading data from Python
+waitfor(u.NumDatagramsAvailable>0);
+if u.NumDatagramsAvailable>0
+    data2 = read(u,u.NumDatagramsAvailable,'string');
+end
+%% Reconstruct original vector 
+jpos = data2(1,end).Date;
+str = erase(jpos,["[","]"]);
+B=split(str,",",1);
+jpos=str2double(B');
+read1 = jpos;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Initiate timing variables
+counter=0;
+excesstime=0;
+tRel=0; 
+tic;
+t0=toc; % calculate initial time
+
+RangeMin=0.001;
+%% Control loop
+while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when the final postion is reached or the time is over
+    time=toc;
+    comp_time_start=tic; 
+    tRel=time-t0; 
+    
+    if tRel<=T
+        %% velocity and position in the istant Trel for the trajectory chosen
+        dX_int(1)=interp1(t,dX_bez(1,:),tRel,'cubic');
+        dX_int(2)=interp1(t,dX_bez(2,:),tRel,'cubic');
+        dX_int(3)=interp1(t,dX_bez(3,:),tRel,'cubic');
+        dX_int(4)=interp1(t,dX_bez(4,:),tRel,'cubic');
+        dX_int(5)=interp1(t,dX_bez(5,:),tRel,'cubic');
+        dX_int(6)=interp1(t,dX_bez(6,:),tRel,'cubic');
+        X_int(1)=interp1(t,X_bez(1,:),tRel,'cubic');
+        X_int(2)=interp1(t,X_bez(2,:),tRel,'cubic');
+        X_int(3)=interp1(t,X_bez(3,:),tRel,'cubic');
+        X_int(4)=interp1(t,X_bez(4,:),tRel,'cubic');
+        X_int(5)=interp1(t,X_bez(5,:),tRel,'cubic');
+        X_int(6)=interp1(t,X_bez(6,:),tRel,'cubic');
+
+        %% Receiving data from camera sensors
+        waitfor(v.NumDatagramsAvailable>0);
+        if v.NumDatagramsAvailable>0
+            istant = istant+1;
+            data1 = read(v,v.NumDatagramsAvailable,'string');
+            %reconstruct original vector
+            ella = data1(1,end).Date;
+            str = erase(ella,["[[","]]"]);
+            A=split(str,'],[',1);
+            B=split(A,",",2);
+            B=B(2:4,:); 
+            ella=str2double(B')/1000; % Trasform in meter
+            dimension=0; % used only to set a dimension of obstacle if the velocity is avaible
+            ella(:,4:6)=dimension; 
+    
+            if ella(1, end)==88888888 
+                ellipsoid = [0,0,0,0,0,0];
+            else
+                ellipsoid = ella(16:17,1:6); % take only two obstacles: the wrists 
+            end
+        end
+
+        w = 0;
+        for w = 1:size(ellipsoid,1)
+            if isnan(ellipsoid(w, 1))
+                ellipsoid(w,:) = [10000,10000,10000,0,0,0];
+            end
+        end
+
+        V_o=ellipsoid(:,4:6)'; 
+
+        o=ellipsoid(:,1:3)'; 
+
+        Q_act=jpos'; % robot joint read
+
+        %% kin_inv_OA_UR5_Link
+        J=Jacobian_UR5_Link(Q_act,7,1); % jacobian until the last joint
+        S=svd(J); %singolar value decomposition
+        s_min=S(6);
+        if s_min<eps
+            lambda=(1-(s_min/eps)^2)*lambda_max^2;
+        else
+            lambda=0;
+        end
+        pinvd_J=J'*inv(J*J'+lambda^2*eye(6)); %Damped Least-Squares
+        J_par=J(1:3,:);
+        S=svd(J_par);
+        s_min=S(3);
+        if s_min<eps
+            lambda=(1-(s_min/eps)^2)*lambda_max^2;
+        else
+            lambda=0;
+        end
+        pinvd_J_par=J_par'*inv(J_par*J_par'+lambda^2*eye(3)); %Damped Least- Squares
+        [X_ac,robot_point]=kin_dir_UR5_Link(Q_act); 
+        robot_point=robot_point(1:3,:);
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        robot_point_g=[];
+        robot_point_g(:,1)=robot_point(:,2);%A
+        robot_point_g(:,2)=robot_point(:,3);%B
+        robot_point_g(:,3)=robot_point(:,6);%C
+        robot_point_g(:,4)=robot_point(:,7);%C1
+        robot_point_g(:,5)=robot_point(:,10);%D
+        robot_point_g(:,6)=robot_point(:,11);%E
+        robot_point_g(:,7)=robot_point(:,12);%F
+        robot_point_g(:,8)=robot_point(:,13);%G==EE
+        [k,dist,x]=dis_link(robot_point_g,o); % Compute the distance
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        [d_min,index]=min(dist);
+        P_r=robot_point_g(:,index)+x(index)*(robot_point_g(:,index+1)-robot_point_g(:,index));
+        P_o=o(:,k(index));
+        v_o=V_o(:,k(index));
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % used only in case v_o obstacle velocity is known
+        if norm(v_o)<v_1 
+            r_min=r_inf;
+        elseif norm(v_o)>v_2
+            r_min=r_sup;
+        else
+            r_min=r_inf+(r_sup-r_inf)/(v_2-v_1)*(norm(v_o)-v_1);
+        end
+        r=4/3*r_min;
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        tollerance=0.50; %0.90
+        if  d_min<tollerance*r_min
+            disp 'fail'
+        end
+        a_v=gain(d_min,r,r_min);
+        J0=Jacobian_UR5_Link(Q_act,index,x(index));   
+        vector=(P_r-P_o-k_v*v_o*dt); %nuovo vector creato per avere la componente di velocità in senso opposto a v_o. k_v è un nuovo guadagno introdotto
+        d0=vector/norm(vector); %d0 is the direction of repulsive velocity (indicated in the article in Figure 4)
+        N=eye(6)-pinvd_J*J;
+        J0_par=J0(1:3,:);
+        S=svd(J0_par);
+        s_min=S(3);
+        if s_min<eps
+            lambda=(1-(s_min/eps)^2)*lambda_max^2;
+        else
+            lambda=0;
+        end
+        pinvd_J0_par=J0_par'*inv(J0_par*J0_par'+lambda^2*eye(3)); %Damped Least- Squares
+    
+        %% Compute error of cartesian coordinate
+        e(1:3,1)=X_int(1:3)'-X_ac(1:3);
+        eul_pl=X_int(4:6);
+        eul_ac=X_ac(4:6);
+        R_pl=eul2rotm(eul_pl,'ZYZ');
+        R_ac=eul2rotm(eul_ac','ZYZ');
+        e(4:6,1)=0.5*(cross(R_ac(:,1),R_pl(:,1))+...
+                cross(R_ac(:,2),R_pl(:,2))+...
+                cross(R_ac(:,3),R_pl(:,3)))/(2*pi);
+                
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        %% Compute dQ depending on the seleceted mode 
+
+        switch mode
+            case 3 %3 dof free
+                J3=[J0_par;J(4:6,:)];
+                S=svd(J3); %singolar value decomposition.
+                s_min=S(6);
+                if s_min<eps
+                    lambda=(1-(s_min/eps)^2)*lambda_max^2;
+                else
+                    lambda=0;
+                end
+                pinvd_J3=J3'*inv(J3*J3'+lambda^2*eye(6)); %Damped Least-Squares
+                
+                dQ=(pinvd_J*(dX_int'+k_e.*e)+...
+                    +pinvd_J3*(a_v*v0_rep*[d0; zeros(3,1)]));
+                    
+            case 2
+                J4=[J0_par;J(4:5,:)];
+                S=svd(J4); %singolar value decomposition.
+                s_min=S(5);
+                if s_min<eps
+                    lambda=(1-(s_min/eps)^2)*lambda_max^2;
+                else
+                    lambda=0;
+                end
+                pinvd_J4=J4'*inv(J4*J4'+lambda^2*eye(5)); %Damped Least-Squares
+                dQ=(pinvd_J*(dX_int'+k_e.*e)+...
+                    +pinvd_J4*(a_v*v0_rep*[d0; zeros(2,1)]));
+
+            otherwise %6 dof free
+                dQ=(pinvd_J*(dX_int'+k_e.*e)+...
+                    +pinvd_J0_par*(a_v*v0_rep*d0));
+        end
+    
+        for j=1:6 % check on dQ if reach the maximum allowed value
+            if abs(dQ(j))>dQ_max
+                dQ(j)=dQ_max*sign(dQ(j));
+            end
+        end
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        comp_time=toc(comp_time_start); 
+        timing(counter+1)=tRel+comp_time;
+        if counter==0
+            deltaT=timing(counter+1);
+        else
+            deltaT=timing(counter+1)-timing(counter);
+        end
+
+        Q_obj=Q_act+deltaT*dQ;
+        
+        
+        Speed = [dQ(1),dQ(2),dQ(3),dQ(4),dQ(5),dQ(6)]; % Velocity to send
+        msg(UR5_istance,sprintf('(2,%f,%f,%f,%f,%f,%f)',Speed)); % velcoity check
+        excesstime_start = tic;
+
+        %% memory vector
+        r_vect(counter+1)=r_min;
+        dQ_vect(:,counter+1)=dQ; % vector joint speed
+        Q_vect(:,counter+1)=Q_obj; % vector joint position
+        deltaT_vect(:,counter+1)=deltaT;
+        jpos_vect(:,counter+1)=jpos'; % vector joint read from the robot
+        read_vect(:,counter+1)=read1';
+        comp_time_vect(:,counter+1)=comp_time;
+        error_vect(:,counter+1)=e;
+        o_vect(:,:,counter+1)=o;
+        dist_vect(:,counter+1)=min(dist);
+
+        %% Reading data from Python
+        waitfor(u.NumDatagramsAvailable>0);
+        if u.NumDatagramsAvailable>0
+            data2 = read(u,u.NumDatagramsAvailable,'string');
+        end
+        %% Reconstruct original vector
+        jpos = data2(1,end).Date;
+        str = erase(jpos,["[","]"]);
+        B=split(str,",",1);
+        jpos=str2double(B');
+        read1 = jpos;
+
+        excesstime=toc(excesstime_start); % Fine timing eccessivo
+        excesstime_vect(:,counter+1)=excesstime;
+        
+
+    else
+
+    end
+    counter=counter+1;
+end
+
+%% Stop the robot when is finished
+dQ=[0;0;0;0;0;0]; 
+Speed = [dQ(1),dQ(2),dQ(3),dQ(4),dQ(5),dQ(6)];
+msg(UR5_istance,sprintf('(2,%f,%f,%f,%f,%f,%f)',Speed)); 
+
+%% Rate computation
+tstart=t0;
+tend=time;
+rate=counter/(tend-tstart);
+disp(rate);
+
+%% Save data
+Workspace = append('.\Data\',Date,'\Workspace_Modo_',int2str(mode),'.mat');
+save(Workspace);
+
+
+%% Grafico posizione e velocità
+figure(1)
+plot(timing,Q_vect(1,:),'linewidth',1);hold on
+plot(timing,Q_vect(2,:),'linewidth',1)
+plot(timing,Q_vect(3,:),'linewidth',1)
+plot(timing,Q_vect(4,:),'linewidth',1)
+plot(timing,Q_vect(5,:),'linewidth',1)
+plot(timing,Q_vect(6,:),'linewidth',1)
+xlabel('t [s]')
+ylabel('q [rad]')
+legend('\theta_1','\theta_2','\theta_3','\theta_4','\theta_5','\theta_6','Location','northoutside','NumColumns',7)
+xlim([0 T]);
+ylim([-1.1*pi 1.1*pi]);
+grid on
+
+
+figure(2)
+plot(timing,dQ_vect(1,:),'linewidth',1);hold on
+plot(timing,dQ_vect(2,:),'linewidth',1);
+plot(timing,dQ_vect(3,:),'linewidth',1);
+plot(timing,dQ_vect(4,:),'linewidth',1);
+plot(timing,dQ_vect(5,:),'linewidth',1);
+plot(timing,dQ_vect(6,:),'linewidth',1);
+xlabel('t [s]')
+ylabel('dq [rad/s]')
+legend('\theta_1','\theta_2','\theta_3','\theta_4','\theta_5','\theta_6','Location','northoutside','NumColumns',7)
+xlim([0 T]);
+ylim([-0.6 0.6]);
+grid on
+
+figure(3) %
+plot(timing,read_vect(1,:),'linewidth',1);hold on
+plot(timing,read_vect(2,:),'linewidth',1)
+plot(timing,read_vect(3,:),'linewidth',1)
+plot(timing,read_vect(4,:),'linewidth',1)
+plot(timing,read_vect(5,:),'linewidth',1)
+plot(timing,read_vect(6,:),'linewidth',1)
+xlabel('t [s]')
+ylabel('q_read [rad]')
+legend('\theta_1','\theta_2','\theta_3','\theta_4','\theta_5','\theta_6','Location','northoutside','NumColumns',7)
+xlim([0 T]);
+grid on
+
+return
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
