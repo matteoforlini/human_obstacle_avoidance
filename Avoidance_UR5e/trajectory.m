@@ -1,10 +1,6 @@
-%Funzione per la definizione della traittoria: Bezier di 3°, 4° e 5° ordine
-%Script: bezier, bezier4, bezier5: definizione della bezier rispettivamente
-%di 3°, 4° e 5°.
-%Da pianificazione cambiare [t,X,dX,coeff]=traietoria_ini_3D_versore; %per bezier normale
-% [t_bez,X_bez, dX_bez] = bezier(coeff(:,1), coeff(:,2), coeff(:,3), coeff(:,4),0,0, dt, T);
+%funciton for trajectory planning: Bezier of 3°, 4° and  5° 
 
-function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) %aggiungi un if per la choice dell'ordine
+function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) 
     global X_i X_f dt T r r_min v0_rep v0_att k_e Q_i O
 
     x_i=X_i(1:3);
@@ -32,16 +28,15 @@ function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) %aggiungi un if pe
     for m=1:1:4
         X_exit=x_i;
         while norm(X_exit-x_f)>level
-            switch m    %m va da 1 a 4 e sceglie il verso dei casi
+            switch m    
                 case 1
                     v_a=v_att(X_prel1(:,end),x_f,d_G,v0_att); %v_attraction
                     v_r=v_rep(X_prel1(:,end),Oi,d_O,v0_rep);  % v_repulsiv
                     v=v_a+v_r;                               
                     if v_r/norm(v_r)+v_a/norm(v_a)==0
-                        vers_v=v/norm(v); %aumenta di una dimensione
-                        %                     v=v+(-1)^m*v0_rep*[-vers_v(2); vers_v(1)];
-                        vers_v_ort = null(vers_v(:).');        %Quale devo prendere? Sono le due direzioni possibili ortogonali al vettore
-                        v=v+(-1)^m*v0_rep*vers_v_ort(:,1); %[-vers_v(2); vers_v(1)];    %dipende da m
+                        vers_v=v/norm(v); 
+                        vers_v_ort = null(vers_v(:).');        
+                        v=v+(-1)^m*v0_rep*vers_v_ort(:,1); 
                     end 
                     X_new1=X_prel1(:,end)+dt*v;
                     X_prel1=[X_prel1 X_new1];
@@ -55,10 +50,9 @@ function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) %aggiungi un if pe
                     v_r=v_rep(X_prel2(:,end),Oi,d_O,v0_rep);  
                     v=v_a+v_r;                                
                     if v_r/norm(v_r)+v_a/norm(v_a)==0
-                        vers_v=v/norm(v); %aumenta di una dimensione
-                        %                     v=v+(-1)^m*v0_rep*[-vers_v(2); vers_v(1)];
-                        vers_v_ort = null(vers_v(:).');        %Quale devo prendere? Sono le due direzioni possibili ortogonali al vettore
-                        v=v+(-1)^m*v0_rep*vers_v_ort(:,2); %[-vers_v(2); vers_v(1)];
+                        vers_v=v/norm(v); 
+                        vers_v_ort = null(vers_v(:).');       
+                        v=v+(-1)^m*v0_rep*vers_v_ort(:,2); 
                     end
                     X_new2=X_prel2(:,end)+dt*v;
                     X_prel2=[X_prel2 X_new2];
@@ -73,8 +67,7 @@ function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) %aggiungi un if pe
                     v=v_a+v_r;
                     if v_r/norm(v_r)+v_a/norm(v_a)==0
                         vers_v=v/norm(v);
-                        %v=v+(-1)^m*v0_rep*[-vers_v(2) ;vers_v(1)]; %devo mettere vers(3)! HOW
-                        vers_v_ort = null(vers_v(:).');        %Quale devo prendere? Sono le due direzioni possibili ortogonali al vettore
+                        vers_v_ort = null(vers_v(:).');        
                         v=v-(-1)^m*v0_rep*vers_v_ort(:,1);
                     end
                     X_new3=X_prel3(:,end)+dt*v;
@@ -90,8 +83,7 @@ function [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve) %aggiungi un if pe
                     v=v_a+v_r;
                     if v_r/norm(v_r)+v_a/norm(v_a)==0
                         vers_v=v/norm(v);
-                        %v=v+(-1)^m*v0_rep*[-vers_v(2) ;vers_v(1)]; %devo mettere vers(3)! HOW
-                        vers_v_ort = null(vers_v(:).');        %Quale devo prendere? Sono le due direzioni possibili ortogonali al vettore
+                        vers_v_ort = null(vers_v(:).');        
                         v=v-(-1)^m*v0_rep*vers_v_ort(:,2);
                     end
                     X_new4=X_prel4(:,end)+dt*v;

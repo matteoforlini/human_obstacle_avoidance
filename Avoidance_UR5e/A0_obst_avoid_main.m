@@ -1,4 +1,4 @@
-close allPunto
+close all
 clear 
 clear global 
 clc
@@ -8,16 +8,12 @@ global X_i X_f dt T r r_min...
        dQ_max  UR5 ik weights v_1 v_2 r_inf r_sup tool
 
 %% To set
-example=2; % example 1 robot movment, 2 robot fixed
-rectilinear=0; % 1=yes; 0=no   %se sta a 0 posso toglierlo ovunque usato 
+example=2; % example 1 robot movment, 2 robot fixed 
 mode=1; % 3 mode: 1=6dof; 2=6dof; 3=3dof
-TrajectoryOnline=1; 
 tool=0.205; 
 Date = 'Dati_2024_05_10'; % Name directory
 
-%>>>>>>>>>>>>>>>>>
-if rectilinear==1; TrajectoryOnline=1; end
-%>>>>>>>>>>>>>>>>>>
+
 %% Data
 dQ_max=0.5*pi; %rad/s %max robot joint speed
 v0_rep=0.4; %repulsive velocity
@@ -43,14 +39,14 @@ weights = [1, 1, 1, 1, 1, 1];
 %% Esempi
 [T,steps,n_frame,dt,v_1,v_2,Oi,Of,dOi,X_i,X_f]=Data_simulation(example);
 
-%% Cinematica inversa di posizione
+%% Position kin inv
 R_ad=[0     0     -1;
       0     1      0;
       1     0      0];
 Rz180=[-1    0     0;
         0   -1     0;
         0    0     1];
-eul_i=X_i(4:6); %angoli di eulero
+eul_i=X_i(4:6); %euler angles
 eul_f=X_f(4:6);
 R_i=eul2rotm(eul_i','ZYZ')*(R_ad); 
 R_f=eul2rotm(eul_f','ZYZ')*(R_ad);
@@ -79,23 +75,6 @@ Q_f=Q_f';
 O=O*0; %used only in case if it is necessary to simulate some obstacles, in this demo are not simulated any obstacles, the obstacles are detected by cameras
 dO=dO*0;
 
-%>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-%% Cut matrix
-app_dO=squeeze(dO(:,1,:)); 
-app_O=squeeze(O(:,1,:));
-
-%% Trajectory rectilinear without obstacle
-if rectilinear==1
-    app_dO=app_dO*0;
-    app_O=app_O*0;
-end
-
-%% remove obstacle
-if TrajectoryOnline==1
-    O=O*0;
-    dO=dO*0;
-end
-%>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> e tohli anche trajectory online
 %% compute bezier
 [t,X,dX,X_bez,dX_bez]=trajectory(order_Bezier_curve); % compute trajectory
 
@@ -190,8 +169,8 @@ while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when th
             B=split(A,",",2);
             B=B(2:4,:); 
             ella=str2double(B')/1000; % Trasform in meter
-            dimension=0; % used only to set a dimension of obstacle if the velocity is avaible
-            ella(:,4:6)=dimension; 
+            velocity=0; % used only to set a velocity of obstacle if the velocity is avaible
+            ella(:,4:6)=velocity; 
     
             if ella(1, end)==88888888 
                 ellipsoid = [0,0,0,0,0,0];
@@ -255,7 +234,8 @@ while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when th
         v_o=V_o(:,k(index));
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % used only in case v_o obstacle velocity is known
+        % used only in case v_o obstacle velocity is known, if it is not
+        % known v_o=0
         if norm(v_o)<v_1 
             r_min=r_inf;
         elseif norm(v_o)>v_2
