@@ -39,7 +39,7 @@ In the folder, there are three Python files. The main file to run is main_human_
 ## Avoidance Algorithm
 In the folder is present the main file to run A0_obst_avoid_main.m and the get_UR_actual_joint.py to read the joint angles.
 In the main file set:
-1.  the tool dimension for your application;
+1.  the tool dimension for your application (change also in the URDF);
 2.  the mode you want (1: 6DoF, 2: 5DoF, 3:3Dof);
 3.  the type of scenario (robot in movement: example=1, robot fixed: example=2). Inside Videos folder there are videos of each example and mode to understand the behavior.;
 4.  Date of acquistion: to save all the variables and graphs inside that folder that is inside Data folder.
