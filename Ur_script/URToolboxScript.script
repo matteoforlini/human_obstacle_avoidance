@@ -53,9 +53,9 @@ socket_close()
 
 # Establish new parameters and open connection to server
 # ADDRESS = "${HOSTNAME}"   # Auto generate hostname
-ADDRESS = "10.1.1.5"        # Hardcoded hostname
+ADDRESS = "169.254.0.25"        # Hardcoded hostname
 # PORT = ${HOSTPORT}        # Auto generate portname
-PORT = 30002                # Hardcoded portname
+PORT = 30000               # Hardcoded portname
 
 isRunning = socket_open(ADDRESS,PORT)   # Open socket
 
