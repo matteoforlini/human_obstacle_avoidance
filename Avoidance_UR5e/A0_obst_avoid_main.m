@@ -120,7 +120,7 @@ if u.NumDatagramsAvailable>0
     data2 = read(u,u.NumDatagramsAvailable,'string');
 end
 %% Reconstruct original vector 
-jpos = data2(1,end).Date;
+jpos = data2(1,end).Data;
 str = erase(jpos,["[","]"]);
 B=split(str,",",1);
 jpos=str2double(B');
@@ -163,7 +163,7 @@ while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when th
             istant = istant+1;
             data1 = read(v,v.NumDatagramsAvailable,'string');
             %reconstruct original vector
-            ella = data1(1,end).Date;
+            ella = data1(1,end).Data;
             str = erase(ella,["[[","]]"]);
             A=split(str,'],[',1);
             B=split(A,",",2);
@@ -354,7 +354,7 @@ while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when th
             data2 = read(u,u.NumDatagramsAvailable,'string');
         end
         %% Reconstruct original vector
-        jpos = data2(1,end).Date;
+        jpos = data2(1,end).Data;
         str = erase(jpos,["[","]"]);
         B=split(str,",",1);
         jpos=str2double(B');
