@@ -137,7 +137,7 @@ t0=toc; % calculate initial time
 
 RangeMin=0.001;
 %% Control loop
-while ((tRel<T) || sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when the final postion is reached or the time is over
+while ((tRel<T) && sum(abs(jpos-Q_f')>=RangeMin)>0) % Exit from the loop when the final postion is reached or the time is over
     time=toc;
     comp_time_start=tic; 
     tRel=time-t0; 
