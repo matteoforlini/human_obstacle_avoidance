@@ -111,7 +111,7 @@ disp('Connected!');
 %% Go to initial position
 Position =  [Q_i(1),Q_i(2),Q_i(3),Q_i(4),Q_i(5),Q_i(6)]; % Initial position
 msg(UR5_istance,sprintf('(%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)',Position,zeros(6,1)));
-pause(6); % Aspetta che il robot si posizioni nel punto iniziale
+pause(6); % wait that the robot reach the starting position
 disp('Move!');
 
 %% Reading data from Python
