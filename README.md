@@ -47,4 +47,17 @@ In the main file set:
 ## UR Script 
 In the folder, there is a script file that needs to be called from a .urp Universal Robot program file inside the robot controller. Ensure the IP address of the robot matches the one set in the code files.
 
+## Bibliography
+If you have found the work useful, please cite it with:
+
+@article{forlini2024experimental,
+  title={Experimental implementation of skeleton tracking for collision avoidance in collaborative robotics},
+  author={Forlini, Matteo and Neri, Federico and Ciccarelli, Marianna and Palmieri, Giacomo and Callegari, Massimo},
+  journal={The International Journal of Advanced Manufacturing Technology},
+  pages={1--17},
+  year={2024},
+  publisher={Springer}
+}
+
+
 
